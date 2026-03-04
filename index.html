@@ -162,6 +162,11 @@ function escapeHTML(str=""){
 function formatDate(iso){ return new Date(iso).toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit",year:"numeric"}); }
 function todayISO(){ return new Date().toISOString(); }
 
+function shortEmail(email=""){
+  const at = email.indexOf("@");
+  return at !== -1 ? email.substring(0, at) : email;
+}  
+  
 const authScreen    = document.getElementById("authScreen");
 const loadingScreen = document.getElementById("loadingScreen");
 const authError     = document.getElementById("auth-error");
@@ -302,9 +307,7 @@ function render(){
           <div style="margin-top:6px;font-size:12px;background:#f4f5f7;padding:6px;border-radius:6px;">
             ${card.comments.map(cm => `
               <div style="margin-bottom:4px">
-                <div style="font-size:11px;color:#888">📅 ${formatDate(cm.date)}${cm.author?` — <strong>${escapeHTML(cm.author)}</strong>`:""}</div>
-                <div style="color:#555">${escapeHTML(cm.text).replace(/\n/g,"<br>")}</div>
-              </div>`).join('<div style="height:1px;background:rgba(0,0,0,.06);margin:4px 0"></div>')}
+          <div style="font-size:11px;color:#888">📅 ${formatDate(cm.date)}${cm.author?` — <strong>${escapeHTML(shortEmail(cm.author))}</strong>`:""}</div>              </div>`).join('<div style="height:1px;background:rgba(0,0,0,.06);margin:4px 0"></div>')}
           </div>` : "";
 
         d.innerHTML = `
@@ -363,8 +366,8 @@ function renderCommentsHistory(comments){
   }
   modalCommentsHistory.innerHTML = comments.map(cm=>`
     <div class="comment-entry">
-      <div class="comment-entry-date">📅 ${formatDate(cm.date)}${cm.author?` — <strong>${escapeHTML(cm.author)}</strong>`:""}</div>
-      <div class="comment-entry-text">${escapeHTML(cm.text).replace(/\n/g,"<br>")}</div>
+    <div class="comment-entry-date">📅 ${formatDate(cm.date)}${cm.author?` — <strong>${escapeHTML(shortEmail(cm.author))}</strong>`:""}</div>
+    <div class="comment-entry-text">${escapeHTML(cm.text).replace(/\n/g,"<br>")}</div>
     </div>`).join("");
   modalCommentsHistory.scrollTop = modalCommentsHistory.scrollHeight;
 }
