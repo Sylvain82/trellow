@@ -172,7 +172,8 @@ window.login = async () => {
   const email = document.getElementById("auth-email").value;
   const pass  = document.getElementById("auth-password").value;
   try { await signInWithEmailAndPassword(auth, email, pass); }
-  catch(e) { showError("Email ou mot de passe incorrect."); }
+// APRÈS
+catch(e) { showError(e.code + " — " + e.message); }
 };
 
 window.register = async () => {
