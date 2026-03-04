@@ -145,8 +145,7 @@ import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, si
 import { getDatabase, ref, set, onValue }
                                from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-const configured = FIREBASE_CONFIG.apiKey !== "VOTRE_API_KEY" && !FIREBASE_CONFIG.apiKey.startsWith("%%");
-if (!configured) {
+const configured = FIREBASE_CONFIG.apiKey !== "VOTRE_API_KEY" && !FIREBASE_CONFIG.apiKey.startsWith("%%");if (!configured) {
   document.getElementById("config-banner").classList.remove("hidden");
   document.getElementById("loadingScreen").style.display = "none";
   document.getElementById("authScreen").style.display = "flex";
