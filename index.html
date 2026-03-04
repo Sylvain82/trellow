@@ -145,15 +145,16 @@ import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, si
 import { getDatabase, ref, set, onValue }
                                from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-const configured = FIREBASE_CONFIG.apiKey !== "VOTRE_API_KEY" && !FIREBASE_CONFIG.apiKey.startsWith("%%");if (!configured) {
+let app, auth, db;
+try {
+  app  = initializeApp(FIREBASE_CONFIG);
+  auth = getAuth(app);
+  db   = getDatabase(app);
+} catch(e) {
+  console.error("Firebase init error:", e);
   document.getElementById("config-banner").classList.remove("hidden");
   document.getElementById("loadingScreen").style.display = "none";
-  document.getElementById("authScreen").style.display = "flex";
 }
-
-const app  = configured ? initializeApp(FIREBASE_CONFIG) : null;
-const auth = configured ? getAuth(app) : null;
-const db   = configured ? getDatabase(app) : null;
 
 function escapeHTML(str=""){
   return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
@@ -172,8 +173,7 @@ window.login = async () => {
   const email = document.getElementById("auth-email").value;
   const pass  = document.getElementById("auth-password").value;
   try { await signInWithEmailAndPassword(auth, email, pass); }
-// APRÈS
-catch(e) { showError(e.code + " — " + e.message); }
+  catch(e) { showError("Email ou mot de passe incorrect."); }
 };
 
 window.register = async () => {
@@ -215,7 +215,7 @@ function startListening() {
   });
 }
 
-if (configured) {
+if (app) {
   onAuthStateChanged(auth, user => {
     loadingScreen.style.display = "none";
     if (user) {
