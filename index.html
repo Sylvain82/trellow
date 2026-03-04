@@ -149,7 +149,7 @@ let app, auth, db;
 try {
   app  = initializeApp(FIREBASE_CONFIG);
   auth = getAuth(app);
-  db   = getDatabase(app);
+  db   = getDatabase(app, FIREBASE_CONFIG.databaseURL);
 } catch(e) {
   console.error("Firebase init error:", e);
   document.getElementById("config-banner").classList.remove("hidden");
