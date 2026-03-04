@@ -130,12 +130,12 @@ button:active{transform:scale(.96);}
 <script type="module">
 
 // ============================================================
-//  👉 REMPLISSEZ VOS INFOS FIREBASE ICI
+//  👉 NE PAS MODIFIER — valeurs injectées par GitHub Actions
 const FIREBASE_CONFIG = {
-apiKey:      "%%FIREBASE_API_KEY%%",
-authDomain:  "%%FIREBASE_AUTH_DOMAIN%%",
-databaseURL: "%%FIREBASE_DB_URL%%",
-projectId:   "%%FIREBASE_PROJECT_ID%%",
+  apiKey:      "%%FIREBASE_API_KEY%%",
+  authDomain:  "%%FIREBASE_AUTH_DOMAIN%%",
+  databaseURL: "%%FIREBASE_DB_URL%%",
+  projectId:   "%%FIREBASE_PROJECT_ID%%",
 };
 // ============================================================
 
@@ -145,8 +145,7 @@ import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, si
 import { getDatabase, ref, set, onValue }
                                from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-const configured = FIREBASE_CONFIG.apiKey !== "VOTRE_API_KEY" 
-                && !FIREBASE_CONFIG.apiKey.startsWith("%%");
+const configured = FIREBASE_CONFIG.apiKey !== "VOTRE_API_KEY" && !FIREBASE_CONFIG.apiKey.startsWith("%%");
 if (!configured) {
   document.getElementById("config-banner").classList.remove("hidden");
   document.getElementById("loadingScreen").style.display = "none";
@@ -192,15 +191,14 @@ let currentUser  = null;
 let boardData    = [];
 let activeCol, activeCard, activeCardEl;
 let unsubscribe  = null;
-let modalOpen    = false; // 🔑 Verrou : bloque le re-rendu Firebase pendant l'édition dans la modale
+let modalOpen    = false;
 
 const users = [
   {id:1, name:"Sellerie",   color:"#e74c3c"},
-  {id:2, name:"Couture", color:"#3498db"},
+  {id:2, name:"Couture",    color:"#3498db"},
   {id:3, name:"Expliseat",  color:"#2ecc71"},
-  {id:4, name:"Menuiserie",  color:"#dbc334"},
-  {id:5, name:"Autre",  color:"#e59999"},
-
+  {id:4, name:"Menuiserie", color:"#dbc334"},
+  {id:5, name:"Autre",      color:"#e59999"},
 ];
 
 function save() {
@@ -213,7 +211,6 @@ function startListening() {
   unsubscribe = onValue(ref(db, "boards/shared"), snapshot => {
     const data = snapshot.val();
     boardData = data || [{title:"To Do",cards:[]},{title:"Doing",cards:[]},{title:"Done",cards:[]}];
-    // Ne pas re-rendre si la modale est ouverte — évite d'écraser les champs en cours de saisie
     if (!modalOpen) render();
   });
 }
@@ -386,7 +383,7 @@ window.openModal = (ci, cardId, el) => {
     }
   }
 
-  modalOpen = true; // 🔑 Verrou activé
+  modalOpen = true;
 
   modal.classList.remove("hidden");
   modalTitre.value        = c.titre||"";
@@ -403,10 +400,7 @@ window.openModal = (ci, cardId, el) => {
       <input type="checkbox" style="width:auto" ${(c.users||[]).includes(u.id)?"checked":""}
       onchange="toggleUser(${u.id},this.checked)"> ${u.name}</label>`;
   });
-
-
 };
-
 
 window.closeModal = () => {
   if (activeCol !== undefined && activeCard !== undefined) {
@@ -426,7 +420,7 @@ window.closeModal = () => {
     c.closed   = modalClosed.checked;
   }
 
-  modalOpen = false; // 🔑 Verrou désactivé
+  modalOpen = false;
   modal.classList.add("hidden");
   render();
 };
