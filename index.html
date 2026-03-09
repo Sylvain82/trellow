@@ -103,6 +103,8 @@ button:active{transform:scale(.96);}
     <div id="modal-users"></div>
     <label>Date création</label>
     <input type="date" id="modal-date-creation" disabled>
+    <label>Titre</label>
+    <input id="modal-titre" placeholder="Titre">
     <label>Date limite</label>
     <input type="date" id="modal-date">
     <label>Priorité</label>
@@ -111,8 +113,6 @@ button:active{transform:scale(.96);}
       <option value="medium">Moyenne</option>
       <option value="high">Haute</option>
     </select>
-    <label>Titre</label>
-    <input id="modal-titre" placeholder="Titre">
     <label>Commentaires</label>
     <div id="modal-comments-history"></div>
     <textarea id="modal-new-comment" placeholder="Ajouter un commentaire…" rows="3" style="margin-top:6px"></textarea>
@@ -162,11 +162,25 @@ function escapeHTML(str=""){
 function formatDate(iso){ return new Date(iso).toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit",year:"numeric"}); }
 function todayISO(){ return new Date().toISOString(); }
 
-function shortEmail(email=""){
-  const at = email.indexOf("@");
-  return at !== -1 ? email.substring(0, at) : email;
-}  
-  
+/**
+ * Transforme un email en "Prénom Nom" lisible.
+ * sylvain.garrigues@bt2igroup.com  →  Sylvain Garrigues
+ * jean-paul.dupont@example.fr      →  Jean-Paul Dupont
+ * Si l'email n'a pas de point dans la partie locale, on capitalise juste le pseudo.
+ */
+function formatAuthor(email = "") {
+  if (!email) return "";
+  const local = email.split("@")[0];           // sylvain.garrigues
+  return local
+    .split(".")
+    .map(part =>
+      part.replace(/-/g, s => s)               // garde les tirets
+          .replace(/(?:^|-)(\w)/g, (_, c) => c.toUpperCase()) // capitalise après tiret
+          .replace(/^(.)/, c => c.toUpperCase()) // capitalise la première lettre
+    )
+    .join(" ");                                 // "Sylvain Garrigues"
+}
+
 const authScreen    = document.getElementById("authScreen");
 const loadingScreen = document.getElementById("loadingScreen");
 const authError     = document.getElementById("auth-error");
@@ -307,7 +321,7 @@ function render(){
           <div style="margin-top:6px;font-size:12px;background:#f4f5f7;padding:6px;border-radius:6px;">
             ${card.comments.map(cm => `
               <div style="margin-bottom:4px">
-          <div style="font-size:11px;color:#888">📅 ${formatDate(cm.date)}${cm.author?` — <strong>${escapeHTML(shortEmail(cm.author))}</strong>`:""}</div>              </div>`).join('<div style="height:1px;background:rgba(0,0,0,.06);margin:4px 0"></div>')}
+          <div style="font-size:11px;color:#888">📅 ${formatDate(cm.date)}${cm.author?` — <strong>${escapeHTML(formatAuthor(cm.author))}</strong>`:""}</div>              </div>`).join('<div style="height:1px;background:rgba(0,0,0,.06);margin:4px 0"></div>')}
           </div>` : "";
 
         d.innerHTML = `
@@ -366,7 +380,7 @@ function renderCommentsHistory(comments){
   }
   modalCommentsHistory.innerHTML = comments.map(cm=>`
     <div class="comment-entry">
-    <div class="comment-entry-date">📅 ${formatDate(cm.date)}${cm.author?` — <strong>${escapeHTML(shortEmail(cm.author))}</strong>`:""}</div>
+    <div class="comment-entry-date">📅 ${formatDate(cm.date)}${cm.author?` — <strong>${escapeHTML(formatAuthor(cm.author))}</strong>`:""}</div>
     <div class="comment-entry-text">${escapeHTML(cm.text).replace(/\n/g,"<br>")}</div>
     </div>`).join("");
   modalCommentsHistory.scrollTop = modalCommentsHistory.scrollHeight;
