@@ -339,8 +339,7 @@ window.addEventListener("online",()=>{document.getElementById("offline-banner").
 window.addEventListener("offline",()=>{document.getElementById("offline-banner").style.display="block";});
 
 // Presence
-function setupPresence(){if(!db||!currentUser)return;const myRef=ref(db,"presence/"+currentUser.uid);set(myRef,{email:currentUser.email,ts:Date.now()});onDisconnect(myRef).remove();setInterval(()=>{if(currentUser)set(myRef,{email:currentUser.email,ts:Date.now()});},30000);onValue(ref(db,"presence"),snap=>{const d=snap.val()||{},now=Date.now();presenceUsers=Object.entries(d).filter(([u,v])=>now-v.ts<60000).map(([u,v])=>({uid:u,email:v.email}));// Enrichir allUsers depuis la présence (fonctionne sans règle spécifique)
-Object.entries(d).forEach(([uid,v])=>{if(v.email&&!allUsers[uid])allUsers[uid]={email:v.email};});renderPresence();populateAssigneeSelects();});}
+function setupPresence(){if(!db||!currentUser)return;const myRef=ref(db,"presence/"+currentUser.uid);set(myRef,{email:currentUser.email,ts:Date.now()});onDisconnect(myRef).remove();setInterval(()=>{if(currentUser)set(myRef,{email:currentUser.email,ts:Date.now()});},30000);onValue(ref(db,"presence"),snap=>{const d=snap.val()||{},now=Date.now();presenceUsers=Object.entries(d).filter(([u,v])=>now-v.ts<60000).map(([u,v])=>({uid:u,email:v.email}));renderPresence();});}
 function renderPresence(){document.getElementById("presence-dots").innerHTML=presenceUsers.map(u=>'<div class="presence-dot" title="'+escapeHTML(formatAuthor(u.email))+'"><span class="presence-tooltip">'+escapeHTML(formatAuthor(u.email))+'</span></div>').join("");}
 
 // Firebase
@@ -349,10 +348,10 @@ function saveActivity(){if(!currentUser||!db)return;try{set(ref(db,"activity"),a
 function logActivity(a,d=""){activityLog.push({date:todayISO(),user:currentUser?currentUser.email:"",action:a,detail:d});if(activityLog.length>100)activityLog=activityLog.slice(-100);saveActivity();}
 
 function startListening(){if(unsubscribe)unsubscribe();unsubscribe=onValue(ref(db,"boards/shared"),snap=>{const d=snap.val();boardData=d||[{title:"À faire",cards:[]},{title:"En cours",cards:[]},{title:"Terminé",cards:[]}];boardData.forEach(col=>{if(!col.cards)col.cards=[];col.cards.forEach(c=>{if(!c.comments)c.comments=[];if(!c.labels)c.labels=c.users||[];if(!c.subtasks)c.subtasks=[];if(!c.reactions)c.reactions={};if(!c.cycleHistory)c.cycleHistory=[];if(c.commentaires){c.comments.push({text:c.commentaires,date:c.commentDate||c.createdAt,author:""});delete c.commentaires;delete c.commentDate;}});});if(!modalOpen){render();}else{// Modale ouverte : rafraîchir uniquement les labels avec la référence fraîche
-const fresh=boardData[activeCol]&&boardData[activeCol].cards[activeCard];if(fresh)renderLabels(fresh);}},err=>{toast("Firebase perdu","error");});onValue(ref(db,"activity"),snap=>{activityLog=snap.val()||[];});onValue(ref(db,"users"),snap=>{const d=snap.val()||{};// Fusionner avec allUsers (ne pas écraser ce qu'on a déjà)
-Object.entries(d).forEach(([uid,v])=>{if(v.email)allUsers[uid]={email:v.email};});populateAssigneeSelects();});}
+const fresh=boardData[activeCol]&&boardData[activeCol].cards[activeCard];if(fresh)renderLabels(fresh);}},err=>{toast("Firebase perdu","error");});onValue(ref(db,"activity"),snap=>{activityLog=snap.val()||[];});}
 
-function populateAssigneeSelects(){const opts=Object.entries(allUsers).map(([uid,u])=>'<option value="'+uid+'">'+escapeHTML(formatAuthor(u.email||""))+"</option>").join("");const fA=document.getElementById("filter-assignee");if(fA){fA.innerHTML='<option value="">Tous</option>'+opts;}const mA=document.getElementById("modal-assignee");if(mA){const cur=mA.value;mA.innerHTML='<option value="">— Personne —</option>'+opts;if(cur)mA.value=cur;}}
+const HARDCODED_USERS=[{id:"sylvain",name:"Sylvain Garrigues"},{id:"jonathan",name:"Jonathan Jalby"},{id:"julie",name:"Julie Bénard"},{id:"bt",name:"BT"}];
+function populateAssigneeSelects(){const opts=HARDCODED_USERS.map(u=>'<option value="'+u.id+'">'+escapeHTML(u.name)+"</option>").join("");const fA=document.getElementById("filter-assignee");if(fA){fA.innerHTML='<option value="">Tous</option>'+opts;}const mA=document.getElementById("modal-assignee");if(mA){const cur=mA.value;mA.innerHTML='<option value="">— Personne —</option>'+opts;if(cur)mA.value=cur;}}
 
 // Filters
 window.applyFilters=()=>{currentFilters={search:document.getElementById("search-input").value.toLowerCase().trim(),priority:document.getElementById("filter-priority").value,label:document.getElementById("filter-label").value,status:document.getElementById("filter-status").value,hideClosed:document.getElementById("filter-hide-closed").checked,assignee:document.getElementById("filter-assignee")?.value||""};render();};
@@ -407,7 +406,8 @@ function render(){
       const rcH=card.recurType?'<span class="card-recur">🔄</span>':"";
       const cyH=card.lastMoved?'<span class="card-cycle">'+daysSince(card.lastMoved)+"j</span>":"";
       const rx=card.reactions||{};const rxH=Object.keys(rx).length?'<div class="card-reactions">'+Object.entries(rx).filter(([e,u])=>u&&Object.keys(u).length>0).map(([emoji,users])=>{const uids=Object.keys(users);const mine=currentUser&&uids.includes(currentUser.uid);return '<span class="card-reaction '+(mine?"mine":"")+'" onclick="event.stopPropagation();toggleReaction('+ci+","+card.id+",'"+emoji+"')"+'"">'+emoji+'<span class="r-count">'+uids.length+"</span></span>";}).join("")+"</div>":"";
-      const asgH=card.assignedTo&&allUsers[card.assignedTo]?'<span class="card-assignee"><span class="av">'+escapeHTML(formatAuthor(allUsers[card.assignedTo].email||"")).charAt(0).toUpperCase()+"</span>"+escapeHTML(formatAuthor(allUsers[card.assignedTo].email||""))+"</span>":"";
+      const asgUser=card.assignedTo?HARDCODED_USERS.find(u=>u.id===card.assignedTo):null;
+      const asgH=asgUser?'<span class="card-assignee"><span class="av">'+escapeHTML(asgUser.name).charAt(0)+"</span>"+escapeHTML(asgUser.name)+"</span>":"";
       d.innerHTML=cv+(card.closed?'<span class="card-badge-done">✔</span>':"")+(card.titre?'<div class="card-title">'+titleH+"</div>":'<div class="card-title" style="opacity:.4">Sans titre</div>')+desc+(lb?'<div class="card-tags">'+lb+"</div>":"")+stH+rxH+'<div class="card-meta">'+dueH+" "+rcH+' <span class="card-priority priority-'+(card.priority||"low")+'">⚡'+pl+"</span> "+cH+" "+cyH+"</div>"+asgH;
       cd.appendChild(d);
     });
