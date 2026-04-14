@@ -411,9 +411,6 @@ function render(){
     board.appendChild(el);
   });
   setupTouch();
-  // Tab badge : cartes en retard
-  const lateCount=boardData.flatMap(c=>c.cards||[]).filter(c=>!c.closed&&c.dueDate&&daysUntil(c.dueDate)<0).length;
-  document.title=lateCount>0?"("+lateCount+") Trellow BT":"Trellow BT";
 }
 
 // Touch drag
