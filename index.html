@@ -145,56 +145,102 @@ button.ghost.active-toggle{opacity:1;background:var(--primary);color:#fff}
 <div class="toast-container" id="toasts"></div>
 
 <script type="module">
-const FIREBASE_CONFIG={apiKey:"%%FIREBASE_API_KEY%%",authDomain:"%%FIREBASE_AUTH_DOMAIN%%",databaseURL:"%%FIREBASE_DB_URL%%",projectId:"%%FIREBASE_PROJECT_ID%%"};
-import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import{getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import{getDatabase,ref,set,onValue,onDisconnect,remove}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-let app,auth,db;
-try{app=initializeApp(FIREBASE_CONFIG);auth=getAuth(app);db=getDatabase(app,FIREBASE_CONFIG.databaseURL);}catch(e){document.getElementById("config-banner").classList.remove("hidden");document.getElementById("loadingScreen").style.display="none";}
 
-// Utils
-function esc(s=""){const d=document.createElement("div");d.textContent=s;return d.innerHTML;}
-function fmtDate(iso){return new Date(iso).toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit",year:"numeric"});}
-function todayISO(){return new Date().toISOString();}
-function todayDate(){return new Date().toISOString().split("T")[0];}
-function fmtAuthor(e=""){if(!e)return"";return e.split("@")[0].split(".").map(p=>p.replace(/(?:^|-)(\w)/g,(_,c)=>c.toUpperCase())).join(" ");}
-function toast(m,t="info"){const el=document.createElement("div");el.className="toast "+(t||"");el.textContent=m;document.getElementById("toasts").appendChild(el);setTimeout(()=>el.remove(),3200);}
-function daysUntil(d){if(!d)return Infinity;const a=new Date(d),b=new Date();a.setHours(0,0,0,0);b.setHours(0,0,0,0);return Math.ceil((a-b)/864e5);}
-function daysSince(d){if(!d)return 0;return Math.floor((Date.now()-new Date(d).getTime())/864e5);}
-function renderMd(t){if(!t)return"";return esc(t).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/\*(.+?)\*/g,"<i>$1</i>").replace(/^- (.+)$/gm,"• $1").replace(/\n/g,"<br>");}
-function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x.toISOString().split("T")[0];}
-function addMonths(d,n){const x=new Date(d);x.setMonth(x.getMonth()+n);return x.toISOString().split("T")[0];}
+// ============================================================
+//  👉 NE PAS MODIFIER — valeurs injectées par GitHub Actions
+const FIREBASE_CONFIG = {
+  apiKey:      "%%FIREBASE_API_KEY%%",
+  authDomain:  "%%FIREBASE_AUTH_DOMAIN%%",
+  databaseURL: "%%FIREBASE_DB_URL%%",
+  projectId:   "%%FIREBASE_PROJECT_ID%%",
+};
+// ============================================================
 
-const labels=[{id:1,name:"Sellerie",color:"#e74c3c"},{id:2,name:"Couture",color:"#3498db"},{id:3,name:"Expliseat",color:"#2ecc71"},{id:4,name:"Menuiserie",color:"#dbc334"},{id:5,name:"Autre",color:"#e59999"}];
-const coverColors=["","#e74c3c","#e67e22","#f1c40f","#2ecc71","#1abc9c","#3498db","#9b59b6","#e84393","#636e72"];
-const reactionEmojis=["👍","❤️","🔥","⚠️","🎉","👀"];
-const fLbl=document.getElementById("filter-label");labels.forEach(l=>{const o=document.createElement("option");o.value=l.id;o.textContent=l.name;fLbl.appendChild(o);});
+import { initializeApp }       from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+                               from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getDatabase, ref, set, onValue }
+                               from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-let currentUser=null,boardData=[],activityLog=[],activeCol,activeCard,unsubscribe=null,modalOpen=false,showArchived=false,compactMode=false;
-let currentFilters={search:"",priority:"",label:"",status:"",hideClosed:false};
-let columnSorts={},presenceUsers=[],colDragIdx=null;
+let app, auth, db;
+try {
+  app  = initializeApp(FIREBASE_CONFIG);
+  auth = getAuth(app);
+  db   = getDatabase(app, FIREBASE_CONFIG.databaseURL);
+} catch(e) {
+  console.error("Firebase init error:", e);
+  document.getElementById("config-banner").classList.remove("hidden");
+  document.getElementById("loadingScreen").style.display = "none";
+}
 
-// Theme
-function toggleTheme(){const h=document.documentElement,c=h.getAttribute("data-theme"),n=c==="light"?"dark":"light";h.setAttribute("data-theme",n);localStorage.setItem("trellow-theme",n);document.getElementById("theme-btn").textContent=n==="light"?"☀️":"🌙";}
-(function(){const s=localStorage.getItem("trellow-theme")||"dark";if(s==="light")document.documentElement.setAttribute("data-theme","light");document.getElementById("theme-btn").textContent=s==="light"?"☀️":"🌙";})();
+function escapeHTML(str=""){
+  return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+}
+function formatDate(iso){ return new Date(iso).toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit",year:"numeric"}); }
+function todayISO(){ return new Date().toISOString(); }
 
-// Compact
-window.toggleCompact=()=>{compactMode=!compactMode;document.getElementById("board").classList.toggle("compact",compactMode);document.getElementById("compact-btn").classList.toggle("active-toggle",compactMode);};
+/**
+ * Transforme un email en "Prénom Nom" lisible.
+ * sylvain.garrigues@bt2igroup.com  →  Sylvain Garrigues
+ * jean-paul.dupont@example.fr      →  Jean-Paul Dupont
+ * Si l'email n'a pas de point dans la partie locale, on capitalise juste le pseudo.
+ */
+function formatAuthor(email = "") {
+  if (!email) return "";
+  const local = email.split("@")[0];           // sylvain.garrigues
+  return local
+    .split(".")
+    .map(part =>
+      part.replace(/-/g, s => s)               // garde les tirets
+          .replace(/(?:^|-)(\w)/g, (_, c) => c.toUpperCase()) // capitalise après tiret
+          .replace(/^(.)/, c => c.toUpperCase()) // capitalise la première lettre
+    )
+    .join(" ");                                 // "Sylvain Garrigues"
+}
 
-// Auth
-const authScreen=document.getElementById("authScreen"),loadingScreen=document.getElementById("loadingScreen"),authError=document.getElementById("auth-error"),headerUser=document.getElementById("header-user"),appEl=document.getElementById("app");
-window.login=async()=>{const e=document.getElementById("auth-email").value.trim(),p=document.getElementById("auth-password").value;if(!e||!p)return authError.textContent="Remplissez tous les champs.";try{await signInWithEmailAndPassword(auth,e,p);}catch(er){authError.textContent="Identifiants incorrects.";}};
-window.logout=async()=>{if(currentUser&&db)try{await remove(ref(db,"presence/"+currentUser.uid));}catch(e){}await signOut(auth);};
-if(app){onAuthStateChanged(auth,user=>{loadingScreen.style.display="none";if(user){currentUser=user;headerUser.textContent=fmtAuthor(user.email);authScreen.style.display="none";appEl.classList.remove("hidden");startListening();setupPresence();}else{currentUser=null;if(unsubscribe){unsubscribe();unsubscribe=null;}boardData=[];appEl.classList.add("hidden");authScreen.style.display="flex";}});}else{loadingScreen.style.display="none";}
+const authScreen    = document.getElementById("authScreen");
+const loadingScreen = document.getElementById("loadingScreen");
+const authError     = document.getElementById("auth-error");
+const headerUser    = document.getElementById("header-user");
 
-// Presence
-function setupPresence(){if(!db||!currentUser)return;const myRef=ref(db,"presence/"+currentUser.uid);set(myRef,{email:currentUser.email,ts:Date.now()});onDisconnect(myRef).remove();setInterval(()=>{if(currentUser)set(myRef,{email:currentUser.email,ts:Date.now()});},30000);onValue(ref(db,"presence"),snap=>{const d=snap.val()||{},now=Date.now();presenceUsers=Object.entries(d).filter(([u,v])=>now-v.ts<60000).map(([u,v])=>({uid:u,email:v.email}));renderPresence();});}
-function renderPresence(){document.getElementById("presence-dots").innerHTML=presenceUsers.map(u=>'<div class="presence-dot"><span class="presence-tooltip">'+esc(fmtAuthor(u.email))+'</span></div>').join("");}
+function showError(m){ authError.textContent = m; }
 
-// Firebase
-function save(){if(!currentUser||!db)return;try{set(ref(db,"boards/shared"),boardData);}catch(e){toast("Erreur sauvegarde","error");}}
-function saveAct(){if(!currentUser||!db)return;try{set(ref(db,"activity"),activityLog.slice(-100));}catch(e){}}
-function logAct(a,d=""){activityLog.push({date:todayISO(),user:currentUser?currentUser.email:"",action:a,detail:d});if(activityLog.length>100)activityLog=activityLog.slice(-100);saveAct();}
+window.login = async () => {
+  const email = document.getElementById("auth-email").value;
+  const pass  = document.getElementById("auth-password").value;
+  try { await signInWithEmailAndPassword(auth, email, pass); }
+  catch(e) { showError("Email ou mot de passe incorrect."); }
+};
+
+window.register = async () => {
+  const email = document.getElementById("auth-email").value;
+  const pass  = document.getElementById("auth-password").value;
+  if (!email || !pass) return showError("Remplissez les deux champs.");
+  if (pass.length < 6) return showError("Le mot de passe doit faire au moins 6 caractères.");
+  try { await createUserWithEmailAndPassword(auth, email, pass); }
+  catch(e) { showError(e.code === "auth/email-already-in-use" ? "Cet email est déjà utilisé." : "Erreur : " + e.message); }
+};
+
+window.logout = async () => { await signOut(auth); };
+
+let currentUser  = null;
+let boardData    = [];
+let activeCol, activeCard, activeCardEl;
+let unsubscribe  = null;
+let modalOpen    = false;
+
+const users = [
+  {id:1, name:"Sellerie",   color:"#e74c3c"},
+  {id:2, name:"Couture",    color:"#3498db"},
+  {id:3, name:"Expliseat",  color:"#2ecc71"},
+  {id:4, name:"Menuiserie", color:"#dbc334"},
+  {id:5, name:"Autre",      color:"#e59999"},
+];
+
+function save() {
+  if (!currentUser || !db) return;
+  set(ref(db, "boards/shared"), boardData);
+}
 
 function startListening(){if(unsubscribe)unsubscribe();unsubscribe=onValue(ref(db,"boards/shared"),snap=>{const d=snap.val();boardData=d||[{title:"À faire",cards:[]},{title:"En cours",cards:[]},{title:"Terminé",cards:[]}];boardData.forEach(col=>{if(!col.cards)col.cards=[];col.cards.forEach(c=>{if(!c.comments)c.comments=[];if(!c.labels)c.labels=c.users||[];if(!c.subtasks)c.subtasks=[];if(!c.reactions)c.reactions={};if(!c.cycleHistory)c.cycleHistory=[];if(!c.attachments)c.attachments=[];if(c.commentaires){c.comments.push({text:c.commentaires,date:c.commentDate||c.createdAt,author:""});delete c.commentaires;delete c.commentDate;}});});if(!modalOpen)render();},err=>{toast("Firebase perdu","error");});onValue(ref(db,"activity"),snap=>{activityLog=snap.val()||[];});}
 
