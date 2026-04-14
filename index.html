@@ -385,14 +385,17 @@ function render(){
     const wip=col.wipLimit||0,over=wip>0&&vis.filter(c=>!c.closed).length>wip;
     const sk=columnSorts[ci]||"date-desc";
     const si={"date-desc":"📅↓","date-asc":"📅↑","due-asc":"⏰↑","due-desc":"⏰↓","priority":"⚡","alpha":"🔤"}[sk]||"";
-    el.draggable=true;el.dataset.colIdx=ci;
+    el.dataset.colIdx=ci;
     el.innerHTML=`<div class="col-header"><span class="col-drag-handle" title="Déplacer la colonne">⠿</span><input value="${escapeHTML(col.title)}" onchange="updateColTitle(${ci},this.value)"><span class="card-counter ${over?'wip-warning':''}">${vis.length}${wip?'/'+wip:''}</span><div class="col-actions"><button onclick="event.stopPropagation();toggleSortMenu(${ci})" title="Trier">${si||'↕️'}</button><button onclick="setWipLimit(${ci})" title="WIP">⚙️</button><button onclick="deleteColumn(${ci})" title="Supprimer">🗑️</button></div></div><div class="cards" data-col="${ci}"></div><button class="add-card-btn" onclick="addCard(${ci})">+ Carte</button>`;
     const cd=el.querySelector(".cards");
 
-    // Column drag events
-    el.addEventListener("dragstart",e=>{if(!e.target.classList.contains("col-drag-handle")&&e.target!==el)return;if(draggedCardData)return;e.stopPropagation();draggedColIdx=ci;setTimeout(()=>el.classList.add("col-dragging"),0);});
-    el.addEventListener("dragend",e=>{el.classList.remove("col-dragging");document.querySelectorAll(".column").forEach(c=>c.classList.remove("col-drag-over"));if(draggedColIdx!==null&&draggedColIdx!==ci){pushUndo();const moved=boardData.splice(draggedColIdx,1)[0];boardData.splice(ci,0,moved);draggedColIdx=null;save();render();}else{draggedColIdx=null;}});
-    el.addEventListener("dragover",e=>{if(draggedColIdx===null||draggedColIdx===ci)return;e.preventDefault();document.querySelectorAll(".column").forEach(c=>c.classList.remove("col-drag-over"));el.classList.add("col-drag-over");});
+    // Column drag — activé uniquement depuis la poignée
+    const handle=el.querySelector(".col-drag-handle");
+    handle.addEventListener("mousedown",()=>{el.draggable=true;});
+    handle.addEventListener("mouseup",()=>{el.draggable=false;});
+    el.addEventListener("dragstart",e=>{if(!el.draggable)return;draggedColIdx=ci;dropTargetColIdx=null;e.dataTransfer.effectAllowed="move";setTimeout(()=>el.classList.add("col-dragging"),0);});
+    el.addEventListener("dragend",()=>{el.draggable=false;el.classList.remove("col-dragging");document.querySelectorAll(".column").forEach(c=>c.classList.remove("col-drag-over"));if(draggedColIdx!==null&&dropTargetColIdx!==null&&draggedColIdx!==dropTargetColIdx){pushUndo();const moved=boardData.splice(draggedColIdx,1)[0];boardData.splice(dropTargetColIdx>draggedColIdx?dropTargetColIdx-1:dropTargetColIdx,0,moved);save();render();}draggedColIdx=null;dropTargetColIdx=null;});
+    el.addEventListener("dragover",e=>{if(draggedColIdx===null||draggedColIdx===ci)return;e.preventDefault();e.dataTransfer.dropEffect="move";document.querySelectorAll(".column").forEach(c=>c.classList.remove("col-drag-over"));el.classList.add("col-drag-over");dropTargetColIdx=ci;});
     el.addEventListener("dragleave",e=>{if(!el.contains(e.relatedTarget))el.classList.remove("col-drag-over");});
 
     // Desktop drag
@@ -446,7 +449,7 @@ function onTM(e){e.preventDefault();if(!touchClone)return;const t=e.touches[0];t
 function onTE(e){document.removeEventListener("touchmove",onTM);document.removeEventListener("touchend",onTE);if(touchClone)touchClone.remove();if(touchEl)touchEl.style.opacity="1";if(!touchActive||!touchData){touchClone=null;touchEl=null;touchData=null;return;}const t=e.changedTouches[0];const tg=document.elementFromPoint(t.clientX,t.clientY);document.querySelectorAll(".cards").forEach(c=>c.classList.remove("drag-over"));if(tg){const cc=tg.closest(".cards");if(cc){const tc=parseInt(cc.dataset.col);if(!isNaN(tc)){const card=boardData[touchData.c].cards.splice(touchData.i,1)[0];if(touchData.c!==tc){if(!card.cycleHistory)card.cycleHistory=[];card.cycleHistory.push({from:boardData[touchData.c]?boardData[touchData.c].title:"?",to:boardData[tc].title,date:todayISO()});card.lastMoved=todayISO();logActivity("Déplacement",'"'+(card.titre||"?")+"\" → "+boardData[tc].title);}if(!boardData[tc].cards)boardData[tc].cards=[];boardData[tc].cards.push(card);save();}}}touchClone=null;touchEl=null;touchData=null;render();}
 
 // Desktop drag (cards)
-let draggedData=null,draggedColIdx=null;
+let draggedData=null,draggedColIdx=null,dropTargetColIdx=null;
 document.addEventListener("dragstart",e=>{if(!e.target.classList.contains("card"))return;if(draggedColIdx!==null)return;e.target.classList.add("dragging");draggedData=JSON.parse(e.target.dataset.drag);setTimeout(()=>{e.target.style.display="none";},0);});
 document.addEventListener("dragend",e=>{if(!e.target.classList.contains("card"))return;e.target.classList.remove("dragging");e.target.style.display="block";document.querySelectorAll(".card-placeholder").forEach(p=>p.remove());draggedData=null;});
 
