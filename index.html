@@ -331,14 +331,16 @@ const authScreen=document.getElementById("authScreen"),loadingScreen=document.ge
 window.login=async()=>{const e=document.getElementById("auth-email").value.trim(),p=document.getElementById("auth-password").value;if(!e||!p)return authError.textContent="Remplissez tous les champs.";try{await signInWithEmailAndPassword(auth,e,p);}catch(er){authError.textContent="Email ou mot de passe incorrect.";}};
 window.logout=async()=>{if(currentUser&&db)try{await remove(ref(db,"presence/"+currentUser.uid));}catch(e){}await signOut(auth);};
 
-if(app){onAuthStateChanged(auth,user=>{loadingScreen.style.display="none";if(user){currentUser=user;headerUser.textContent=formatAuthor(user.email);authScreen.style.display="none";appEl.classList.remove("hidden");if(db)set(ref(db,"users/"+user.uid),{email:user.email});startListening();setupPresence();}else{currentUser=null;if(unsubscribe){unsubscribe();unsubscribe=null;}boardData=[];appEl.classList.add("hidden");authScreen.style.display="flex";}});}else{loadingScreen.style.display="none";}
+if(app){onAuthStateChanged(auth,user=>{loadingScreen.style.display="none";if(user){currentUser=user;headerUser.textContent=formatAuthor(user.email);authScreen.style.display="none";appEl.classList.remove("hidden");// Enregistrer dans users/ ET alimenter allUsers immédiatement avec l'user courant
+allUsers[user.uid]={email:user.email};if(db)set(ref(db,"users/"+user.uid),{email:user.email});populateAssigneeSelects();startListening();setupPresence();}else{currentUser=null;if(unsubscribe){unsubscribe();unsubscribe=null;}boardData=[];allUsers={};appEl.classList.add("hidden");authScreen.style.display="flex";}});}else{loadingScreen.style.display="none";}
 
 // Offline detection
 window.addEventListener("online",()=>{document.getElementById("offline-banner").style.display="none";toast("Reconnecté ✓","success");if(currentUser&&db)set(ref(db,"boards/shared"),boardData);});
 window.addEventListener("offline",()=>{document.getElementById("offline-banner").style.display="block";});
 
 // Presence
-function setupPresence(){if(!db||!currentUser)return;const myRef=ref(db,"presence/"+currentUser.uid);set(myRef,{email:currentUser.email,ts:Date.now()});onDisconnect(myRef).remove();setInterval(()=>{if(currentUser)set(myRef,{email:currentUser.email,ts:Date.now()});},30000);onValue(ref(db,"presence"),snap=>{const d=snap.val()||{},now=Date.now();presenceUsers=Object.entries(d).filter(([u,v])=>now-v.ts<60000).map(([u,v])=>({uid:u,email:v.email}));renderPresence();});}
+function setupPresence(){if(!db||!currentUser)return;const myRef=ref(db,"presence/"+currentUser.uid);set(myRef,{email:currentUser.email,ts:Date.now()});onDisconnect(myRef).remove();setInterval(()=>{if(currentUser)set(myRef,{email:currentUser.email,ts:Date.now()});},30000);onValue(ref(db,"presence"),snap=>{const d=snap.val()||{},now=Date.now();presenceUsers=Object.entries(d).filter(([u,v])=>now-v.ts<60000).map(([u,v])=>({uid:u,email:v.email}));// Enrichir allUsers depuis la présence (fonctionne sans règle spécifique)
+Object.entries(d).forEach(([uid,v])=>{if(v.email&&!allUsers[uid])allUsers[uid]={email:v.email};});renderPresence();populateAssigneeSelects();});}
 function renderPresence(){document.getElementById("presence-dots").innerHTML=presenceUsers.map(u=>'<div class="presence-dot" title="'+escapeHTML(formatAuthor(u.email))+'"><span class="presence-tooltip">'+escapeHTML(formatAuthor(u.email))+'</span></div>').join("");}
 
 // Firebase
@@ -347,7 +349,8 @@ function saveActivity(){if(!currentUser||!db)return;try{set(ref(db,"activity"),a
 function logActivity(a,d=""){activityLog.push({date:todayISO(),user:currentUser?currentUser.email:"",action:a,detail:d});if(activityLog.length>100)activityLog=activityLog.slice(-100);saveActivity();}
 
 function startListening(){if(unsubscribe)unsubscribe();unsubscribe=onValue(ref(db,"boards/shared"),snap=>{const d=snap.val();boardData=d||[{title:"À faire",cards:[]},{title:"En cours",cards:[]},{title:"Terminé",cards:[]}];boardData.forEach(col=>{if(!col.cards)col.cards=[];col.cards.forEach(c=>{if(!c.comments)c.comments=[];if(!c.labels)c.labels=c.users||[];if(!c.subtasks)c.subtasks=[];if(!c.reactions)c.reactions={};if(!c.cycleHistory)c.cycleHistory=[];if(c.commentaires){c.comments.push({text:c.commentaires,date:c.commentDate||c.createdAt,author:""});delete c.commentaires;delete c.commentDate;}});});if(!modalOpen){render();}else{// Modale ouverte : rafraîchir uniquement les labels avec la référence fraîche
-const fresh=boardData[activeCol]&&boardData[activeCol].cards[activeCard];if(fresh)renderLabels(fresh);}},err=>{toast("Firebase perdu","error");});onValue(ref(db,"activity"),snap=>{activityLog=snap.val()||[];});onValue(ref(db,"users"),snap=>{const d=snap.val()||{};allUsers=d;populateAssigneeSelects();});}
+const fresh=boardData[activeCol]&&boardData[activeCol].cards[activeCard];if(fresh)renderLabels(fresh);}},err=>{toast("Firebase perdu","error");});onValue(ref(db,"activity"),snap=>{activityLog=snap.val()||[];});onValue(ref(db,"users"),snap=>{const d=snap.val()||{};// Fusionner avec allUsers (ne pas écraser ce qu'on a déjà)
+Object.entries(d).forEach(([uid,v])=>{if(v.email)allUsers[uid]={email:v.email};});populateAssigneeSelects();});}
 
 function populateAssigneeSelects(){const opts=Object.entries(allUsers).map(([uid,u])=>'<option value="'+uid+'">'+escapeHTML(formatAuthor(u.email||""))+"</option>").join("");const fA=document.getElementById("filter-assignee");if(fA){fA.innerHTML='<option value="">Tous</option>'+opts;}const mA=document.getElementById("modal-assignee");if(mA){const cur=mA.value;mA.innerHTML='<option value="">— Personne —</option>'+opts;if(cur)mA.value=cur;}}
 
