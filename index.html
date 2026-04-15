@@ -344,7 +344,6 @@ function renderMd(t){if(!t)return"";return escapeHTML(t).replace(/\*\*(.+?)\*\*/
 function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x.toISOString().split("T")[0];}
 function addMonths(d,n){const x=new Date(d);x.setMonth(x.getMonth()+n);return x.toISOString().split("T")[0];}
 
-const labels=[{id:1,name:"Sellerie",color:"#e74c3c"},{id:2,name:"Couture",color:"#3498db"},{id:3,name:"Expliseat",color:"#2ecc71"},{id:4,name:"Menuiserie",color:"#dbc334"},{id:5,name:"Autre",color:"#e59999"},{id:6,name:"RH",color:"#9b59b6"},{id:7,name:"FY",color:"#e67e22"},{id:8,name:"Stratification",color:"#1abc9c"}];
 const coverColors=["","#e74c3c","#e67e22","#f1c40f","#2ecc71","#1abc9c","#3498db","#9b59b6","#e84393","#636e72"];
 const reactionEmojis=["👍","❤️","🔥","⚠️","🎉","👀"];
 // Labels dynamiques (chargés depuis Firebase)
