@@ -110,6 +110,12 @@ header{backdrop-filter:blur(12px);background:var(--header-bg);padding:12px 20px;
 .card-subtasks{font-size:11px;color:var(--card-muted);margin-top:3px;display:flex;align-items:center;gap:4px;}
 .subtask-bar{height:4px;background:#e0e0e0;border-radius:2px;flex:1;max-width:60px;overflow:hidden;}
 .subtask-fill{height:100%;background:var(--success);border-radius:2px;}
+.card-subtask-list{margin-top:4px;display:flex;flex-direction:column;gap:2px;}
+.card-subtask-item{display:flex;align-items:center;gap:5px;font-size:11px;line-height:1.3;}
+.card-subtask-check{width:12px;height:12px;margin:0;cursor:pointer;flex-shrink:0;accent-color:var(--success);}
+.card-subtask-label{color:var(--card-text,#333);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
+.card-subtask-label.done{text-decoration:line-through;opacity:.45;}
+.card-subtask-more{font-size:10px;color:var(--card-muted);margin-top:1px;font-style:italic;padding-left:17px;}
 .card-last-comment{font-size:10px;color:var(--card-muted);margin-top:4px;font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-left:2px solid #ddd;padding-left:5px;}
 .card-recur{font-size:10px;color:#9b59b6;font-weight:600;}
 .card-cycle{font-size:10px;color:var(--card-muted);margin-left:auto;}
@@ -457,7 +463,7 @@ function render(){
     sorted.forEach(card=>{
       const ri=boardData[ci].cards.findIndex(x=>x.id===card.id);
       const d=document.createElement("div");d.className="card";d.draggable=true;d.dataset.drag=JSON.stringify({c:ci,i:ri});d.dataset.cardId=card.id;
-      d.onclick=e=>{if(!e.target.closest(".card-reaction"))openModal(ci,card.id);};
+      d.onclick=e=>{if(!e.target.closest(".card-reaction")&&!e.target.classList.contains("card-subtask-check"))openModal(ci,card.id);};
       d.classList.add("priority-"+(card.priority||"low")+"-border");
       if(card.closed)d.classList.add("closed");
       const age=daysSince(card.lastMoved||card.createdAt);
@@ -468,7 +474,9 @@ function render(){
       const lb=(card.labels||[]).map(id=>{const l=labels.find(x=>x.id===id);return l?'<span class="tag" style="background:'+l.color+'">'+escapeHTML(l.name)+"</span>":"";}).join("");
       const pl=card.priority==="high"?"Haute":card.priority==="medium"?"Moyenne":"Basse";
       const st=card.subtasks||[];const sd=st.filter(s=>s.done).length;
-      const stH=st.length?'<div class="card-subtasks">☑ '+sd+"/"+st.length+'<div class="subtask-bar"><div class="subtask-fill" style="width:'+Math.round(sd/st.length*100)+'%"></div></div></div>':"";
+      const stProgressH=st.length?'<div class="card-subtasks">☑ '+sd+"/"+st.length+'<div class="subtask-bar"><div class="subtask-fill" style="width:'+Math.round(sd/st.length*100)+'%"></div></div></div>':"";
+      const stItemsH=st.map((s,i)=>'<div class="card-subtask-item"><input type="checkbox" class="card-subtask-check"'+(s.done?' checked':'')+" onclick=\"event.stopPropagation();toggleSubFromCard("+ci+","+card.id+","+i+",this.checked)\">"+'<span class="card-subtask-label'+(s.done?' done':'')+'">'+escapeHTML(s.text)+'</span></div>').join('');
+      const stH=st.length?stProgressH+'<div class="card-subtask-list">'+stItemsH+'</div>':"";
       const cc=(card.comments||[]).length;const cH=cc?'<span class="card-comments-count">💬 '+cc+"</span>":"";
       const lastCm=cc?card.comments[cc-1]:null;
       const lastCmH=lastCm?'<div class="card-last-comment">💬 '+escapeHTML(lastCm.text.substring(0,80))+"</div>":"";
@@ -539,6 +547,7 @@ window.toggleModalReact=emoji=>{if(!currentUser)return;const c=boardData[activeC
 
 function renderSubs(c){if(!c.subtasks)c.subtasks=[];mSubs.innerHTML="";c.subtasks.forEach((s,i)=>{const d=document.createElement("div");d.className="subtask-item";d.innerHTML='<input type="checkbox" '+(s.done?"checked":"")+" onchange=\"toggleSub("+i+',this.checked)" style="width:auto"><span class="subtask-label '+(s.done?"done":"")+'">'+escapeHTML(s.text)+'</span><button onclick="rmSub('+i+')">✕</button>';mSubs.appendChild(d);});}
 window.toggleSub=(i,v)=>{boardData[activeCol].cards[activeCard].subtasks[i].done=v;saveCard(activeCol,activeCard);renderSubs(boardData[activeCol].cards[activeCard]);};
+window.toggleSubFromCard=(ci,cardId,subIdx,v)=>{const idx=boardData[ci].cards.findIndex(c=>c.id===cardId);if(idx===-1)return;const card=boardData[ci].cards[idx];if(!card.subtasks||card.subtasks[subIdx]===undefined)return;card.subtasks[subIdx].done=v;saveCard(ci,idx);render();};
 window.rmSub=i=>{boardData[activeCol].cards[activeCard].subtasks.splice(i,1);saveCard(activeCol,activeCard);renderSubs(boardData[activeCol].cards[activeCard]);};
 window.addSubtask=()=>{const inp=document.getElementById("subtask-input"),t=inp.value.trim();if(!t){toast("Vide","warning");return;}const c=boardData[activeCol].cards[activeCard];if(!c.subtasks)c.subtasks=[];c.subtasks.push({text:t,done:false});saveCard(activeCol,activeCard);inp.value="";renderSubs(c);};
 
