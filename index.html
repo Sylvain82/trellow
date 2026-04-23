@@ -78,6 +78,11 @@ header{backdrop-filter:blur(12px);background:var(--header-bg);padding:12px 20px;
 .col-actions{display:flex;gap:2px;flex-shrink:0;}
 .col-actions button{background:none;color:var(--text-on-dark);opacity:.4;font-size:12px;padding:3px 5px;}
 .col-actions button:hover{opacity:1;}
+.col-color-menu{position:absolute;top:100%;right:0;background:var(--modal-bg);color:var(--modal-text);border-radius:10px;padding:8px;box-shadow:0 8px 30px rgba(0,0,0,.25);z-index:50;display:flex;gap:6px;flex-wrap:wrap;width:168px;}
+.col-color-swatch{width:26px;height:26px;border-radius:7px;cursor:pointer;border:2px solid transparent;transition:.15s;flex-shrink:0;}
+.col-color-swatch:hover{transform:scale(1.2);}
+.col-color-swatch.active{border-color:#333;box-shadow:0 0 0 2px rgba(0,0,0,.15);}
+.col-color-swatch.no-color{background:var(--input-bg);border:2px dashed #bbb;display:flex;align-items:center;justify-content:center;font-size:12px;color:#999;}
 .sort-menu{position:absolute;top:100%;right:0;background:var(--modal-bg);color:var(--modal-text);border-radius:10px;padding:6px 0;box-shadow:0 8px 30px rgba(0,0,0,.25);z-index:50;min-width:160px;font-size:12px;}
 .sort-menu button{display:block;width:100%;text-align:left;padding:6px 14px;background:none;color:var(--modal-text);font-size:12px;border-radius:0;}
 .sort-menu button:hover{background:rgba(79,140,255,.1);}
@@ -398,7 +403,7 @@ function saveColumnCards(ci){if(!currentUser||!db)return;const col=boardData[ci]
 function saveCardMove(fromCol,toCol){if(!currentUser||!db)return;try{const updates={};updates[`boards/shared/${fromCol}/cards`]=boardData[fromCol].cards||[];updates[`boards/shared/${toCol}/cards`]=boardData[toCol].cards||[];update(ref(db),updates);}catch(e){toast("Erreur sauvegarde","error");}}
 
 // Écriture granulaire : métadonnées d'une colonne (titre, wipLimit)
-function saveColumnMeta(ci){if(!currentUser||!db)return;const col=boardData[ci];if(!col)return;try{set(ref(db,`boards/shared/${ci}/title`),col.title);set(ref(db,`boards/shared/${ci}/wipLimit`),col.wipLimit||0);}catch(e){toast("Erreur sauvegarde","error");}}
+function saveColumnMeta(ci){if(!currentUser||!db)return;const col=boardData[ci];if(!col)return;try{set(ref(db,`boards/shared/${ci}/title`),col.title);set(ref(db,`boards/shared/${ci}/wipLimit`),col.wipLimit||0);set(ref(db,`boards/shared/${ci}/color`),col.color||"");}catch(e){toast("Erreur sauvegarde","error");}}
 
 // Sauvegarde des labels dans Firebase
 function saveLabels(){if(!currentUser||!db)return;const obj={};labels.forEach(l=>{obj[l.id]=l;});try{set(ref(db,"labels"),obj);}catch(e){toast("Erreur sauvegarde labels","error");}}
@@ -428,6 +433,34 @@ function sortFn(k){switch(k){case"date-asc":return(a,b)=>new Date(a.createdAt||0
 window.toggleSortMenu=ci=>{const ex=document.getElementById("sort-menu-"+ci);if(ex){ex.remove();return;}document.querySelectorAll(".sort-menu").forEach(m=>m.remove());const col=document.querySelectorAll(".column")[ci];const hd=col.querySelector(".col-header");const m=document.createElement("div");m.className="sort-menu";m.id="sort-menu-"+ci;const cur=columnSorts[ci]||"date-desc";[["date-desc","Récentes ↓"],["date-asc","Anciennes ↑"],["due-asc","Échéance ↑"],["due-desc","Échéance ↓"],["priority","Priorité"],["alpha","A → Z"]].forEach(([k,l])=>{m.innerHTML+=`<button class="${cur===k?'active-sort':''}" onclick="setSortCol(${ci},'${k}')">${l}</button>`;});hd.appendChild(m);setTimeout(()=>document.addEventListener("click",function h(e){if(!m.contains(e.target)){m.remove();document.removeEventListener("click",h);}},{once:false}),10);};
 window.setSortCol=(ci,k)=>{columnSorts[ci]=k;document.querySelectorAll(".sort-menu").forEach(m=>m.remove());render();};
 
+const COL_COLORS=[
+  {val:"",label:"✕"},
+  {val:"#e74c3c",label:""},{val:"#e67e22",label:""},{val:"#f1c40f",label:""},
+  {val:"#2ecc71",label:""},{val:"#1abc9c",label:""},{val:"#3498db",label:""},
+  {val:"#9b59b6",label:""},{val:"#e91e8c",label:""},{val:"#607d8b",label:""},
+];
+window.toggleColorMenu=ci=>{
+  const ex=document.getElementById("col-color-menu-"+ci);
+  if(ex){ex.remove();return;}
+  document.querySelectorAll(".col-color-menu,.sort-menu").forEach(m=>m.remove());
+  const col=document.querySelectorAll(".column")[ci];
+  const hd=col.querySelector(".col-header");
+  const m=document.createElement("div");
+  m.className="col-color-menu";m.id="col-color-menu-"+ci;
+  const cur=boardData[ci].color||"";
+  COL_COLORS.forEach(({val,label})=>{
+    const sw=document.createElement("div");
+    sw.className="col-color-swatch"+(val===cur?" active":"")+(val===""?" no-color":"");
+    if(val)sw.style.background=val; else sw.textContent="✕";
+    sw.title=val||"Aucune";
+    sw.onclick=(e)=>{e.stopPropagation();setColColor(ci,val);m.remove();};
+    m.appendChild(sw);
+  });
+  hd.appendChild(m);
+  setTimeout(()=>document.addEventListener("click",function h(e){if(!m.contains(e.target)){m.remove();document.removeEventListener("click",h);}},{once:false}),10);
+};
+window.setColColor=(ci,color)=>{boardData[ci].color=color;saveColumnMeta(ci);render();};
+
 // Render
 const board=document.getElementById("board");
 function highlight(raw,term){if(!term||!raw)return escapeHTML(raw||"");const escaped=escapeHTML(raw);const re=new RegExp("("+term.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+")","gi");return escaped.replace(re,'<mark class="sh">$1</mark>');}
@@ -441,7 +474,8 @@ function render(){
     const sk=columnSorts[ci]||"date-desc";
     const si={"date-desc":"📅↓","date-asc":"📅↑","due-asc":"⏰↑","due-desc":"⏰↓","priority":"⚡","alpha":"🔤"}[sk]||"";
     el.dataset.colIdx=ci;
-    el.innerHTML=`<div class="col-header"><span class="col-drag-handle" title="Déplacer la colonne">⠿</span><input value="${escapeHTML(col.title)}" onchange="updateColTitle(${ci},this.value)"><span class="card-counter ${over?'wip-warning':''}">${vis.length}${wip?'/'+wip:''}</span><div class="col-actions"><button onclick="event.stopPropagation();toggleSortMenu(${ci})" title="Trier">${si||'↕️'}</button><button onclick="setWipLimit(${ci})" title="WIP">⚙️</button><button onclick="deleteColumn(${ci})" title="Supprimer">🗑️</button></div></div><div class="cards" data-col="${ci}"></div><button class="add-card-btn" onclick="addCard(${ci})">+ Carte</button>`;
+    if(col.color)el.style.borderTop=`4px solid ${col.color}`;
+    el.innerHTML=`<div class="col-header"><span class="col-drag-handle" title="Déplacer la colonne">⠿</span><input value="${escapeHTML(col.title)}" onchange="updateColTitle(${ci},this.value)"><span class="card-counter ${over?'wip-warning':''}">${vis.length}${wip?'/'+wip:''}</span><div class="col-actions"><button onclick="event.stopPropagation();toggleColorMenu(${ci})" title="Couleur colonne">🎨</button><button onclick="event.stopPropagation();toggleSortMenu(${ci})" title="Trier">${si||'↕️'}</button><button onclick="setWipLimit(${ci})" title="WIP">⚙️</button><button onclick="deleteColumn(${ci})" title="Supprimer">🗑️</button></div></div><div class="cards" data-col="${ci}"></div><button class="add-card-btn" onclick="addCard(${ci})">+ Carte</button>`;
     const cd=el.querySelector(".cards");
 
     // Column drag — activé uniquement depuis la poignée
