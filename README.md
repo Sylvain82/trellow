@@ -168,6 +168,3 @@ Ouvrez ensuite <http://localhost:8000>. Si l'initialisation de Firebase échoue,
 - **Labels par défaut** : créés au premier lancement si la base n'en contient aucun ; ils se gèrent ensuite depuis le bouton 🏷️.
 - **Couleurs de couverture et de colonne** : tableaux `coverColors` et `COL_COLORS`.
 
-## Licence
-
-Aucune licence n'est définie pour le moment. Ajoutez un fichier `LICENSE` si vous souhaitez autoriser la réutilisation du code.
